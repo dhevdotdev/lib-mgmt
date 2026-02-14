@@ -1,5 +1,0 @@
-.git
-.gitignore
-/hex
-!cmd/hex/
-!cmd/hex/**
