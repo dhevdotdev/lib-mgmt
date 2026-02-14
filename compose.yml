@@ -1,0 +1,86 @@
+services:
+
+  auth-api:
+    build:
+      context: ./auth-api
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      - DATABASE_USERNAME=${DATABASE_USERNAME}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
+      - RAILS_ENV=${RAILS_ENV}
+      - SECRET_KEY_BASE=${SECRET_KEY_BASE}
+      - RAILS_MASTER_KEY=${RAILS_MASTER_KEY}
+      - DATABASE_HOST=${DATABASE_HOST}
+      - MONGODB_HOST=${MONGODB_HOST}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+    command: bash -c "bundle exec rails db:create db:migrate db:seed && bundle exec rails s -p 3000 -b '0.0.0.0'"
+
+  hex:
+    build:
+      context: ./hex
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - DB_USER=${DATABASE_USERNAME}
+      - DB_PASSWORD=${DATABASE_PASSWORD}
+      - DB_NAME=${DB_NAME}
+      - DB_HOST=${DATABASE_HOST}
+      - RAILS_API_URL=${RAILS_API_URL}
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_DB=${MONGODB_DB}
+      - MONGODB_COLLECTION=${MONGODB_COLLECTION}
+      - SEED_DATABASE=${SEED_DATABASE}
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongodb:
+        condition: service_started
+      auth-api:
+        condition: service_started
+
+  mysql:
+    image: mysql
+    environment:
+      - MYSQL_ROOT_PASSWORD=${DATABASE_PASSWORD}
+      - MYSQL_DATABASE=${DB_NAME}
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3307:3306" # 3306 on host machine is already in use by local installation of MySQL
+    healthcheck:
+      test: [ "CMD", "mysqladmin", "ping", "-h", "localhost" ]
+      timeout: 20s
+      retries: 10
+
+  mongodb:
+    image: mongo:6.0
+    volumes:
+      - mongodb_data:/data/db
+    ports:
+      - "27018:27017" # 27017 on host machine is already in use by local installation of MongoDB
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    ports:
+      - "5173:5173"
+    environment:
+      - VITE_RAILS_API_URL=${VITE_RAILS_API_URL}
+      - VITE_GOLANG_API_URL=${VITE_GOLANG_API_URL}
+    depends_on:
+      - auth-api
+      - hex
+    volumes:
+      - /app/node_modules
+
+volumes:
+  mysql_data:
+  mongodb_data:
