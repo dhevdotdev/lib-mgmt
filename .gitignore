@@ -1,4 +1,0 @@
-.env
-/hex
-!cmd/hex/
-!cmd/hex/**
